@@ -1,0 +1,53 @@
+# Brand listening on X - collection and scoring configuration.
+# "Acme Trading" is a placeholder brand: replace the handle, accounts and keywords with your own.
+# Edit freely; the collector re-reads this file on every run.
+
+brand:
+  handle: acmetrading                # our own account (posts from it are flagged is_own)
+  own_accounts:                      # any other accounts that count as "us" (their posts are not public opinion)
+    - acmetrading
+    - acmetrading_support            # e.g. a separate support handle
+  keywords:                          # if a reply names the brand with one of these (beyond the auto @tag) it is "explicit"
+    - acme trading
+    - acmetrading
+    - acme-trading
+    - "@acmetrading"
+    - "#acmetrading"
+
+queries:
+  # ONLY these two. Do not add other handles or brands.
+  # Operators: https://github.com/igorbrigadir/twitter-advanced-search
+  - name: mentions                    # anyone tagging us
+    query: "@acmetrading"
+  - name: brand_keywords              # anyone naming us WITHOUT tagging us
+    query: '"Acme Trading" OR AcmeTrading OR "Acme-Trading" OR #acmetrading'
+
+collection:
+  max_posts_per_query: 500           # per query, per run (X returns ~20 per request)
+  first_run_lookback_days: 30        # how far back to go on the very first run
+  refresh_window_days: 2             # each run re-scans this many days back to refresh engagement counts
+  interval_minutes: 15               # scheduler interval
+  fetch_parents_per_run: 25          # replies to posts we don't have: fetch the parent (context only), max per run
+  thread_crawl_days: 7               # our own posts this recent get their full conversation + quotes read directly
+  thread_crawl_posts_per_run: 10     # ... at most this many posts per run (re-crawled while X's counts exceed ours)
+
+# Keyword-based product/topic tags (case-insensitive substring match on post text)
+product_tags:
+  payouts: [payout, payouts, withdrawal, withdraw, paid out, paid me, cashout]
+  challenge: [challenge, evaluation, phase 1, phase 2, phase1, phase2, passed, funded account, funded]
+  rules: [rule, rules, drawdown, consistency, violation, breach, breached]
+  support: [support, ticket, customer service, live chat, email them]
+  platform: [platform, mt5, mt4, ctrader, match trader, tradelocker, dxtrade, spread, slippage, execution]
+  pricing: [price, pricing, discount, promo, coupon, code, cheap, expensive, fee, fees]
+  affiliate: [affiliate, referral, ib, partner program]
+
+# Risk keywords (case-insensitive). Higher weight -> higher risk score.
+risk_keywords:
+  # "breach"/"breached" are deliberately NOT here: in prop-firm talk they mean failing a challenge rule.
+  high: [scam, scammer, scammed, scamming, fraud, fraudulent, stole, stolen, steal, thief, ponzi, lawsuit, sue, suing, chargeback, banned, blacklist, denied, refused, rejected, hacked, exit scam, rug pull, rugged, not paid, never paid, didn't pay, did not pay, won't pay, refuse to pay]
+  medium: [delay, delayed, delaying, waiting, still waiting, no response, not responding, ignored, ignoring, issue, issues, problem, problems, complaint, complaints, unfair, avoid, warning, beware, disappointed, worst, terrible, awful, stuck, pending]
+
+risk_thresholds:
+  high: 60                 # score needed for "high" (also needs a high keyword OR strongly negative sentiment)
+  medium: 35
+  strong_negative: -0.7    # sentiment score at or below this counts as strongly negative

@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme Trading · X Listening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Colors: the original dashboard palette (blue accent, red for negative). Layout and type: Clay. */
+:root {
+  color-scheme: light;
+  --bg:#f9f9f7; --surface:#fcfcfb; --border:#e1e0d9; --text:#0b0b0b; --text2:#52514e; --muted:#898781; --axis:#c3c2b7;
+  --accent:#2a78d6; --on-accent:#ffffff; --chart-pos:#2a78d6; --chart-neg:#e34948;
+  --pos:#0ca30c; --pos-text:#006300; --neg:#d03b3b; --neu:#c3c2b7; --warning:#fab219; --serious:#ec835a;
+  --navon:#efefec; --track:#e1e0d9; --avbg:#e1e0d9; --avfg:#0b0b0b; --r:18px;
+  --display:"Sora", system-ui, sans-serif; --body:"Plus Jakarta Sans", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --bg:#0d0d0d; --surface:#1a1a19; --border:#2c2c2a; --text:#ffffff; --text2:#c3c2b7; --muted:#898781; --axis:#383835;
+  --accent:#3987e5; --on-accent:#ffffff; --chart-pos:#3987e5; --chart-neg:#e66767;
+  --pos:#0ca30c; --pos-text:#0ca30c; --neg:#d03b3b; --neu:#383835; --warning:#fab219; --serious:#ec835a;
+  --navon:#2c2c2a; --track:#2c2c2a; --avbg:#383835; --avfg:#ffffff; } }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#0d0d0d; --surface:#1a1a19; --border:#2c2c2a; --text:#ffffff; --text2:#c3c2b7; --muted:#898781; --axis:#383835;
+  --accent:#3987e5; --on-accent:#ffffff; --chart-pos:#3987e5; --chart-neg:#e66767;
+  --pos:#0ca30c; --pos-text:#0ca30c; --neg:#d03b3b; --neu:#383835; --warning:#fab219; --serious:#ec835a;
+  --navon:#2c2c2a; --track:#2c2c2a; --avbg:#383835; --avfg:#ffffff; }
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 var(--body); -webkit-font-smoothing:antialiased; }
+a { color:var(--accent); text-decoration:none; } a:hover { color:var(--text); }
+button, select, input { font:inherit; color:var(--text); }
+button { cursor:pointer; }
+.topbar { position:sticky; top:0; z-index:10; height:60px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; padding:0 20px; }
+.logo { font-family:var(--display); font-weight:700; font-size:15px; display:flex; align-items:center; gap:10px; white-space:nowrap; }
+.mark { width:24px; height:24px; border-radius:8px; background:var(--accent); display:inline-block; }
+.nav { display:flex; gap:4px; }
+.nav button { border:0; background:transparent; padding:8px 14px; border-radius:10px; font-size:13.5px; color:var(--text2); }
+.nav button.on { background:var(--navon); color:var(--text); font-weight:600; }
+.spacer { flex-grow:1; }
+.seg { display:inline-flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); }
+.seg button { border:0; background:transparent; padding:7px 12px; font-size:12.5px; color:var(--text2); }
+.seg button.on { background:var(--accent); color:var(--on-accent); font-weight:600; }
+.search { display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:10px; padding:0 12px; background:var(--surface); width:230px; height:36px; }
+.search input { border:0; background:transparent; outline:none; width:100%; font-size:13px; }
+.search svg { color:var(--muted); flex-shrink:0; }
+.ib { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text2); }
+.status { font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--pos); display:inline-block; }
+.dot.warn { background:var(--warning); } .dot.bad { background:var(--neg); }
+main { max-width:1440px; margin:0 auto; padding:18px 20px 40px; display:flex; flex-direction:column; gap:14px; }
+.view { display:none; flex-direction:column; gap:14px; } .view.on { display:flex; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:16px 18px; min-width:0; }
+.ct { font-family:var(--display); font-size:15px; font-weight:600; }
+.cs { font-size:12px; color:var(--muted); margin:2px 0 10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.key { display:inline-block; width:10px; height:10px; border-radius:3px; }
+.kpis { display:grid; grid-template-columns:repeat(8, minmax(0, 1fr)); gap:12px; }
+@media (max-width: 1260px) { .kpis { grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .kpis { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+.tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:14px 16px; }
+.tl { font-size:12px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tv { font-family:var(--display); font-size:26px; font-weight:600; margin-top:2px; letter-spacing:-0.01em; }
+.td { font-size:11.5px; color:var(--muted); margin-top:2px; white-space:nowrap; } .td.good { color:var(--pos-text); } .td.bad { color:var(--neg); }
+.ribbon { display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--neg); border-radius:12px; padding:10px 16px; font-size:13px; }
+.ribbon .lbl { font-family:var(--display); font-weight:600; white-space:nowrap; }
+.ribbon .who { color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.ribbon a.go { margin-left:auto; white-space:nowrap; font-weight:600; }
+.attn { display:flex; flex-direction:column; }
+.attn .item { display:grid; grid-template-columns:minmax(120px, 170px) 64px minmax(0, 1fr) 150px; gap:12px; align-items:center; padding:8px 0; border-top:1px solid var(--border); font-size:13px; color:var(--text); }
+.attn .item:first-child { border-top:0; }
+.attn .who { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.attn .who small { display:block; font-weight:400; color:var(--muted); font-size:11px; }
+.attn .txt { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text2); }
+.attn .pm { gap:10px; justify-content:flex-end; }
+.tbl { display:grid; gap:0; font-size:13px; }
+.tbl > div { display:contents; }
+.tbl span { padding:7px 6px; border-top:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.tbl .hd span { border-top:0; padding-top:0; font-size:11.5px; color:var(--muted); font-weight:500; }
+.tbl .num { text-align:right; font-variant-numeric:tabular-nums; color:var(--text2); }
+.tbl .neg { color:var(--neg); }
+.tbl .nm { display:flex; align-items:center; gap:8px; }
+.tbl .bar { display:flex; align-items:center; } .tbl .bar i { display:block; height:8px; background:var(--accent); border-radius:4px; }
+@media (max-width: 760px) { .attn .item { grid-template-columns:1fr; gap:4px; } .attn .pm { justify-content:flex-start; } }
+.charts { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px; }
+.card canvas { width:100% !important; height:190px !important; }
+.cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px; align-items:start; }
+.rows { display:flex; flex-direction:column; gap:9px; }
+.row { display:flex; align-items:center; gap:10px; font-size:13px; }
+.rn { width:130px; display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rb { flex-grow:1; height:8px; background:var(--track); border-radius:4px; overflow:hidden; } .fill { display:block; height:100%; background:var(--accent); border-radius:4px; }
+.rv { width:48px; text-align:right; font-variant-numeric:tabular-nums; font-size:12px; color:var(--text2); } .rv.neg { color:var(--neg); }
+.filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.tabs { display:inline-flex; gap:2px; border:1px solid var(--border); border-radius:10px; padding:2px; background:var(--surface); flex-wrap:wrap; }
+.tabs button { border:0; background:transparent; padding:6px 11px; border-radius:8px; font-size:12.5px; color:var(--text2); }
+.tabs button.on { background:var(--navon); color:var(--text); font-weight:600; }
+select { border:1px solid var(--border); border-radius:10px; padding:7px 10px; background:var(--surface); font-size:12.5px; }
+label.chk { font-size:12.5px; color:var(--text2); display:flex; align-items:center; gap:6px; }
+.thread { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:16px 18px 10px; }
+.thread.ctx { background:transparent; border-style:dashed; }
+.post { display:flex; gap:12px; padding:2px 0 10px; }
+.avcol { display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0; }
+.av { width:40px; height:40px; border-radius:50%; background:var(--avbg); color:var(--avfg); display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:700; font-size:14px; overflow:hidden; flex-shrink:0; }
+.av img { width:100%; height:100%; object-fit:cover; display:block; }
+.av.sm { width:32px; height:32px; font-size:11px; }
+.av.own { background:var(--accent); color:var(--on-accent); }
+.rail { width:2px; flex-grow:1; background:var(--border); border-radius:2px; min-height:12px; }
+.root > .avcol > .rail { background:var(--accent); opacity:.5; }
+.pbody { flex-grow:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.ph { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.pn { font-weight:600; font-size:13.5px; } .pu { font-size:12px; color:var(--muted); }
+.pt { font-size:13.5px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+.ctx .pt, .ctx .pn { color:var(--text2); }
+.pm { display:flex; align-items:center; gap:14px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+.m { display:inline-flex; align-items:center; gap:5px; }
+.chips { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.chip { display:inline-flex; align-items:center; font-size:11px; padding:2px 9px; border-radius:999px; border:1px solid var(--border); color:var(--text2); font-weight:600; white-space:nowrap; }
+.chip.pos { border-color:var(--pos); color:var(--pos-text); } .chip.neg { border-color:var(--neg); color:var(--neg); } .chip.neu { color:var(--muted); }
+.chip.own { background:var(--accent); color:var(--on-accent); border-color:transparent; }
+.chip.warn { background:var(--warning); color:#0b0b0b; border-color:transparent; }
+.chip.high { background:var(--neg); color:#fff; border-color:transparent; } .chip.medium { background:var(--serious); color:#0b0b0b; border-color:transparent; }
+.chip.handled { background:var(--pos); color:#fff; border-color:transparent; }
+.chip.tag { background:var(--navon); border-color:transparent; }
+.lnk { display:inline-flex; align-items:center; gap:4px; font-size:12px; }
+.acts { display:inline-flex; gap:4px; margin-left:auto; }
+.acts button { border:1px solid var(--border); background:var(--surface); border-radius:8px; padding:2px 8px; font-size:11.5px; color:var(--text2); }
+.acts button:hover { color:var(--text); border-color:var(--muted); }
+.rsum { display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--text2); padding:6px 0 8px 52px; flex-wrap:wrap; }
+.rsum button { border:1px solid var(--border); background:transparent; border-radius:8px; padding:4px 10px; font-size:12px; color:var(--accent); }
+.rsum .n { color:var(--neg); } .rsum .h { color:var(--neg); font-weight:600; } .rsum .rv2 { color:var(--text2); }
+.replies { display:flex; flex-direction:column; }
+.reply { padding-left:0; }
+.more { padding:4px 0 6px 52px; font-size:12.5px; }
+.pager { display:flex; gap:8px; align-items:center; justify-content:flex-end; color:var(--text2); font-size:12px; }
+.pager button { border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:6px 12px; }
+.empty { color:var(--muted); padding:28px; text-align:center; }
+.note { font-size:12px; color:var(--muted); }
+@media (max-width: 760px) { .topbar { height:auto; flex-wrap:wrap; padding:10px 16px; } main { padding:14px 16px 32px; } .search { width:100%; } .rsum, .more { padding-left:0; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><span class="mark"></span>Acme Trading · X Listening</div>
+  <div class="nav"><button data-view="overview" class="on">Overview</button><button data-view="conv">Conversations</button></div>
+  <span class="spacer"></span>
+  <div class="seg" id="period"><button data-days="1">24h</button><button data-days="7" class="on">7d</button><button data-days="30">30d</button><button data-days="90">90d</button><button data-days="182">6m</button><button data-days="365">1y</button><button data-days="3650">All</button></div>
+  <span class="status" id="range"></span>
+  <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.6" y2="16.6"></line></svg><input id="q" type="text" placeholder="Search posts, replies or @user"></div>
+  <button class="ib" id="theme" title="Light / dark" aria-label="Toggle theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+  <div class="status" id="health">loading…</div>
+</div>
+
+<main>
+  <section class="view on" id="view-overview">
+    <div class="kpis" id="kpis"></div>
+    <div class="ribbon" id="attention" style="display:none"></div>
+    <div class="charts">
+      <div class="card"><div class="ct">Posts per <span class="bucket">day</span></div><div class="cs">Everything about Acme Trading (UTC)</div><canvas id="cVolume"></canvas></div>
+      <div class="card"><div class="ct">Sentiment per <span class="bucket">day</span></div><div class="cs"><span class="key" style="background:var(--chart-pos)"></span>Positive above <span class="key" style="background:var(--chart-neg)"></span>Negative below · neutral in tooltip</div><canvas id="cSent"></canvas></div>
+      <div class="card"><div class="ct">Average sentiment</div><div class="cs">-1 very negative to +1 very positive</div><canvas id="cAvg"></canvas></div>
+      <div class="card"><div class="ct">Views per <span class="bucket">day</span></div><div class="cs">Views on posts about Acme Trading</div><canvas id="cViews"></canvas></div>
+    </div>
+    <div class="cols">
+      <div class="card"><div class="ct">Topics</div><div class="cs">Click a topic to open it in Conversations</div><div class="tbl" id="topics" style="grid-template-columns:minmax(90px,1fr) minmax(60px,1.2fr) 52px 52px"></div></div>
+      <div class="card"><div class="ct">Top users</div><div class="cs">Ranked by engagement · click to open their posts</div><div class="tbl" id="authors" style="grid-template-columns:minmax(120px,1fr) 70px 46px 62px 46px"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-conv">
+    <div class="filters">
+      <div class="tabs" id="tabs">
+        <button data-tab="all" class="on">All</button><button data-tab="mentions">Mentions</button><button data-tab="keywords">Keyword posts</button>
+        <button data-tab="negative">Negative</button><button data-tab="risk">High risk</button><button data-tab="review">To review</button><button data-tab="own">Our posts</button>
+      </div>
+      <select id="sort"><option value="newest">Newest post</option><option value="activity">Latest activity (incl. replies)</option><option value="replies">Most replies</option><option value="engagement">Most engagement</option><option value="views">Most views</option><option value="risk">Highest risk</option></select>
+      <label class="chk"><input type="checkbox" id="hideOwn"> hide our posts</label>
+      <button id="clearTag" class="chip tag" style="display:none; cursor:pointer"></button>
+      <span class="spacer"></span>
+      <span class="note" id="convNote"></span>
+    </div>
+    <div id="feed" style="display:flex; flex-direction:column; gap:12px;"></div>
+    <div class="pager"><span id="pageInfo"></span><button id="prev">‹ Prev</button><button id="next">Next ›</button></div>
+  </section>
+</main>
+
+<script>
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const state = { view:'overview', days:7, tab:'all', sort:'newest', hideOwn:false, q:'', tag:'', offset:0, limit:30, role:'viewer', roleLoaded:false };
+const charts = {};
+const fmt = n => { n = Number(n||0); if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e4) return (n/1e3).toFixed(1)+'K'; return n.toLocaleString(); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = (a,b) => b ? Math.round(100*a/b) : 0;
+const when = iso => { const d = new Date(iso); return d.toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); };
+const I = {
+  eye:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  heart:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
+  msg:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
+  rep:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+  quote:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5H3v8h4c0 4-1 5-4 5v3z"/><path d="M14 21c3 0 7-1 7-8V5h-7v8h4c0 4-1 5-4 5v3z"/></svg>',
+  ext:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>'
+};
+async function api(path, opts) { const r = await fetch(path, opts); if (!r.ok) throw new Error(path + ' → ' + r.status); return r.json(); }
+
+/* ---------- theme ---------- */
+(function(){ try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch(e){} })();
+document.getElementById('theme').addEventListener('click', () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const next = cur === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('theme', next); } catch(e){}
+  loadOverview();
+});
+
+/* ---------- charts ---------- */
+Chart.defaults.font.family = css('--body'); Chart.defaults.font.size = 11;
+function scales(extraY = {}) { return {
+  x: { grid:{display:false}, border:{color:css('--axis')}, ticks:{color:css('--muted'), maxRotation:0, autoSkip:true} },
+  y: { grid:{color:css('--border'), lineWidth:1}, border:{display:false}, ticks:{color:css('--muted'), precision:0}, ...extraY } }; }
+function mk(id, cfg) { if (charts[id]) charts[id].destroy(); Chart.defaults.color = css('--text2'); charts[id] = new Chart(document.getElementById(id), cfg); }
+const bar = (label, data, color) => ({ label, data, backgroundColor:color, maxBarThickness:24, borderRadius:4, borderSkipped:'start' });
+
+function tile(label, value, delta, upIsGood, unit = '%') {
+  let d = ''; if (state.days >= 3650) delta = null;  // "All" has no previous period
+  if (delta != null && isFinite(delta)) { const good = delta === 0 ? null : (delta > 0) === upIsGood; d = `<div class="td ${good===null?'':good?'good':'bad'}">${delta>0?'+':''}${delta}${unit} vs prev.</div>`; }
+  return `<div class="tile"><div class="tl" title="${label}">${label}</div><div class="tv">${value}</div>${d}</div>`;
+}
+const change = (c,p) => p ? Math.round(100*(c-p)/p) : null;
+
+async function loadOverview() {
+  const o = await api(`/api/overview?days=${state.days}`);
+  const c = o.current, p = o.previous;
+  document.getElementById('kpis').innerHTML =
+    tile('Posts', fmt(c.posts), change(c.posts,p.posts), true) +
+    tile('Replies (of posts)', fmt(c.replies), change(c.replies,p.replies), true) +
+    tile('Views', fmt(c.views), change(c.views,p.views), true) +
+    tile('Engagement', fmt(c.engagement), change(c.engagement,p.engagement), true) +
+    tile('Unique users', fmt(c.authors), change(c.authors,p.authors), true) +
+    tile('Negative share', pct(c.negative,c.posts)+'%', (pct(c.negative,c.posts) - pct(p.negative,p.posts)) || null, false, ' pts') +
+    tile('High-risk posts', fmt(c.high_risk), change(c.high_risk,p.high_risk), false) +
+    tile('Needs review', fmt(c.to_review), null, false);
+
+  const at = document.getElementById('attention');
+  if (o.attention.length) {
+    const names = o.attention.slice(0, 4).map(x => '@' + esc(x.username)).join(', ') + (o.attention.length > 4 ? ` +${o.attention.length - 4}` : '');
+    const views = o.attention.reduce((s, x) => s + (x.view_count || 0), 0);
+    at.className = 'ribbon'; at.style.display = '';
+    at.innerHTML = `<span class="chip high">${o.attention.length}</span><span class="lbl">Needs attention</span><span class="who">unhandled high-risk ${o.attention.length===1?'post':'posts'} · ${fmt(views)} views · ${names}</span><a href="#" data-open="all" class="go">Review ›</a>`;
+  } else { at.style.display = 'none'; }
+
+  document.querySelectorAll('.bucket').forEach(el => el.textContent = o.bucket);
+  const rs = document.getElementById('range');
+  rs.textContent = o.oldest ? `${new Date(o.oldest).toLocaleDateString(undefined,{day:'numeric',month:'short'})} – today` : '';
+  rs.title = o.oldest ? `Data in this range starts ${new Date(o.oldest).toLocaleString()}` : '';
+  const labels = o.daily.map(d => o.bucket === 'month' ? new Date(d.day).toLocaleString(undefined, {month:'short', year:'2-digit'}) : o.bucket === 'week' ? 'wk ' + new Date(d.day).toLocaleString(undefined, {day:'numeric', month:'short'}) : d.day.slice(5));
+  mk('cVolume', { type:'bar', data:{ labels, datasets:[bar('Posts', o.daily.map(d=>d.posts), css('--accent'))] }, options:{ plugins:{legend:{display:false}}, scales:scales({beginAtZero:true}) } });
+  mk('cSent', { type:'bar', data:{ labels, datasets:[ bar('Positive', o.daily.map(d=>d.positive), css('--chart-pos')), bar('Negative', o.daily.map(d=>-d.negative), css('--chart-neg')) ] },
+    options:{ plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:ctx=>`${ctx.dataset.label}: ${Math.abs(ctx.raw)}`, afterBody:items=>`Neutral: ${o.daily[items[0].dataIndex].neutral}` } } },
+      scales:{ x:{...scales().x, stacked:true}, y:{...scales().y, stacked:true, ticks:{color:css('--muted'), precision:0, callback:v=>Math.abs(v)}} } } });
+  mk('cAvg', { type:'line', data:{ labels, datasets:[{ label:'Avg sentiment', data:o.daily.map(d=>d.avg_sentiment==null?null:+d.avg_sentiment.toFixed(3)), borderColor:css('--accent'), borderWidth:2, pointRadius:4, pointBackgroundColor:css('--accent'), pointBorderColor:css('--surface'), pointBorderWidth:2, tension:.25, spanGaps:true, fill:{target:{value:0}, above:'rgba(42,120,214,.10)', below:'rgba(227,73,72,.10)'} }] },
+    options:{ plugins:{legend:{display:false}}, interaction:{mode:'index', intersect:false}, scales:scales({min:-1, max:1, ticks:{color:css('--muted'), stepSize:.5}}) } });
+  mk('cViews', { type:'bar', data:{ labels, datasets:[bar('Views', o.daily.map(d=>d.views), css('--accent'))] }, options:{ plugins:{legend:{display:false}}, scales:scales({beginAtZero:true, ticks:{color:css('--muted'), callback:v=>fmt(v)}}) } });
+
+  const mx = t => Math.max(1, ...t.map(x=>x.n));
+  const barCell = (n, m) => `<span class="bar"><i style="width:${pct(n, m)}%"></i></span>`;
+  document.getElementById('topics').innerHTML = o.tags.length ? `<div class="hd"><span>Topic</span><span></span><span class="num">Posts</span><span class="num">Neg.</span></div>` +
+    o.tags.map(t => `<div><span class="nm"><a href="#" data-tag="${esc(t.tag)}">${esc(t.tag)}</a></span>${barCell(t.n, mx(o.tags))}<span class="num">${t.n}</span><span class="num neg">${t.negative}</span></div>`).join('') : '<div class="empty">No topics yet</div>';
+  document.getElementById('authors').innerHTML = o.authors.length ? `<div class="hd"><span>User</span><span class="num">Followers</span><span class="num">Posts</span><span class="num">Views</span><span class="num">Neg.</span></div>` +
+    o.authors.map(a => `<div><span class="nm"><a href="#" data-user="${esc(a.username)}" style="display:flex;align-items:center;gap:8px;min-width:0"><span style="flex-shrink:0">${avatar(a, true)}</span><span style="overflow:hidden;text-overflow:ellipsis">@${esc(a.username)}</span></a></span><span class="num">${fmt(a.followers_count)}</span><span class="num">${a.posts}</span><span class="num">${fmt(a.views)}</span><span class="num neg">${a.negative}</span></div>`).join('') : '<div class="empty">No users yet</div>';
+}
+
+/* ---------- conversations ---------- */
+function avatar(x, small) {
+  const ini = (x.username||'?').replace(/_/g,' ').trim().split(/\s+/).map(s=>s[0]).join('').slice(0,2).toUpperCase();
+  const img = x.profile_image_url ? `<img src="${esc(x.profile_image_url)}" alt="" loading="lazy" onerror="this.remove()">` : '';
+  return `<div class="av ${small?'sm':''} ${x.is_own?'own':''}">${img}${esc(ini)}</div>`;
+}
+function chips(x) {
+  const s = x.sentiment; let out = `<span class="chip ${s==='positive'?'pos':s==='negative'?'neg':'neu'}">${s||'unscored'}</span>`;
+  if (x.sentiment_override) out += '<span class="chip">manual</span>';
+  if (x.needs_review) out += '<span class="chip warn">needs review</span>';
+  if (x.risk_level === 'high' || x.risk_level === 'medium') out += `<span class="chip ${x.risk_level}">risk ${x.risk_score}</span>`;
+  if (x.handled) out += '<span class="chip handled">handled</span>';
+  (x.tags||[]).filter(t=>!t.startsWith('risk:')).forEach(t => out += `<span class="chip tag">${esc(t)}</span>`);
+  return out;
+}
+function acts(x) {
+  if (state.role !== 'admin') return '';
+  return `<span class="acts"><button data-act="override" data-id="${x.id}" data-v="positive" title="Set positive">+</button><button data-act="override" data-id="${x.id}" data-v="neutral" title="Set neutral">○</button><button data-act="override" data-id="${x.id}" data-v="negative" title="Set negative">−</button>${x.sentiment_override?`<button data-act="override" data-id="${x.id}" data-v="" title="Back to automatic">auto</button>`:''}<button data-act="handled" data-id="${x.id}" data-v="${x.handled?0:1}">${x.handled?'Unhandle':'Handled'}</button></span>`;
+}
+function metrics(x, full) {
+  return `<span class="m">${I.eye}${x.view_count==null?'–':fmt(x.view_count)}</span><span class="m">${I.heart}${fmt(x.like_count)}</span>` +
+    (full ? `<span class="m">${I.msg}${fmt(x.reply_count)}</span><span class="m">${I.rep}${fmt(x.repost_count)}</span><span class="m">${I.quote}${fmt(x.quote_count)}</span>` : '');
+}
+function postHtml(x, opts) {
+  const { root, ctx } = opts;
+  const kind = x.in_reply_to_post_id ? (root ? `replying to @${esc(x.in_reply_to_username||'?')} (original not available)` : 'reply') : x.is_repost ? 'repost' : x.is_quote ? 'quote' : 'post';
+  return `<div class="post ${root?'root':'reply'}">
+    <div class="avcol">${avatar(x, !root)}<div class="rail"></div></div>
+    <div class="pbody">
+      <div class="ph"><span class="pn">${esc(x.display_name||x.username)}</span><span class="pu">@${esc(x.username)} · ${fmt(x.followers_count)} followers · ${kind} · ${when(x.created_at)}</span>${ctx?'<span class="chip">context · not counted</span>':''}${x.is_own?'<span class="chip own">our post</span>':''}</div>
+      <div class="pt">${esc(x.text)}</div>
+      <div class="pm">${metrics(x, root)}<a class="lnk" href="${esc(x.url)}" target="_blank" rel="noopener">open on X ${I.ext}</a></div>
+      <div class="chips">${ctx?'':chips(x)}${acts(x)}</div>
+    </div></div>`;
+}
+function threadHtml(t) {
+  const ctx = !!t.is_context;
+  let html = `<div class="thread ${ctx?'ctx':''}" data-id="${t.id}">${postHtml(t, {root:true, ctx})}`;
+  if (t.replies_total) {
+    const hidden = t.replies_total - t.replies.length;
+    html += `<div class="rsum"><span>${t.replies_total} ${t.replies_total===1?'reply':'replies'} collected</span>` +
+      (t.replies_negative ? `<span class="n">${t.replies_negative} negative</span>` : '') +
+      (t.replies_high ? `<span class="h">${t.replies_high} high risk</span>` : '') +
+      (t.replies_review ? `<span class="rv2">${t.replies_review} to review</span>` : '') +
+      (t.replies.length ? `<span>${t.replies.length} shown</span>` : '') +
+      (hidden > 0 ? `<button data-expand="${t.id}">Show all ${t.replies_total} replies</button>` : (t.replies.length ? `<button data-collapse="${t.id}">Hide replies</button>` : '')) + `</div>`;
+    html += `<div class="replies" data-replies="${t.id}">${t.replies.map(r => postHtml(r, {root:false})).join('')}</div>`;
+  }
+  return html + `</div>`;
+}
+let feedCache = {};
+async function loadFeed() {
+  const p = new URLSearchParams({ days:state.days, tab:state.tab, hide_own:state.hideOwn, q:state.q, tag:state.tag, sort:state.sort, limit:state.limit, offset:state.offset });
+  const r = await api('/api/feed?' + p);
+  feedCache = Object.fromEntries(r.items.map(t => [t.id, t]));
+  const f = document.getElementById('feed');
+  f.innerHTML = r.items.length ? r.items.map(threadHtml).join('') : '<div class="card empty">Nothing matches. Try a longer period or another tab.</div>';
+  const from = r.total ? state.offset+1 : 0, to = Math.min(state.offset+state.limit, r.total);
+  document.getElementById('pageInfo').textContent = `${from}–${to} of ${r.total} threads`;
+  document.getElementById('prev').disabled = state.offset === 0; document.getElementById('next').disabled = to >= r.total;
+  document.getElementById('convNote').textContent = 'Replies are folded unless they carry risk, strong negativity, engagement, or name Acme Trading themselves.';
+}
+async function expandReplies(id) {
+  const box = document.querySelector(`[data-replies="${id}"]`); const t = feedCache[id]; if (!box || !t) return;
+  const r = await api(`/api/posts/${id}/replies`);
+  box.innerHTML = r.items.map(x => postHtml(x, {root:false})).join('');
+  const btn = document.querySelector(`[data-expand="${id}"]`); if (btn) { btn.textContent = 'Show only important replies'; btn.dataset.collapse = id; delete btn.dataset.expand; }
+}
+function collapseReplies(id) {
+  const box = document.querySelector(`[data-replies="${id}"]`); const t = feedCache[id]; if (!box || !t) return;
+  box.innerHTML = t.replies.map(x => postHtml(x, {root:false})).join('');
+  const btn = document.querySelector(`[data-collapse="${id}"]`); if (btn) { const hidden = t.replies_total - t.replies.length; if (hidden > 0) { btn.textContent = `Show all ${t.replies_total} replies`; btn.dataset.expand = id; delete btn.dataset.collapse; } else { btn.remove(); } }
+}
+
+/* ---------- health ---------- */
+async function loadHealth() {
+  const h = await api('/api/health');
+  const lastOk = h.last_ok_run ? new Date(h.last_ok_run) : null;
+  const stale = !lastOk || (Date.now() - lastOk) > 3 * h.interval_minutes * 60000;
+  const accOk = h.accounts.some(a => a.active);
+  const ago = d => { const m = Math.round((Date.now() - d) / 60000); return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m/60)} h ago` : `${Math.round(m/1440)} d ago`; };
+  document.getElementById('health').innerHTML = `<span class="dot ${!accOk?'bad':stale?'warn':''}"></span>${accOk ? (stale ? 'NOT LIVE · last collected ' + (lastOk ? ago(lastOk) : 'never') : 'live · collected ' + ago(lastOk)) : 'no collection account'} · ${fmt(h.posts)} posts`;
+  document.getElementById('health').title = lastOk ? 'Last successful collection: ' + lastOk.toLocaleString() : '';
+}
+
+/* ---------- wiring ---------- */
+function showView(v) { state.view = v; document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v)); document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'view-' + v)); if (v === 'conv') loadFeed(); else loadOverview(); }
+document.querySelector('.nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showView(b.dataset.view); });
+document.getElementById('period').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; [...e.currentTarget.children].forEach(x => x.classList.toggle('on', x===b)); state.days = +b.dataset.days; state.offset = 0; refresh(); });
+document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; [...e.currentTarget.children].forEach(x => x.classList.toggle('on', x===b)); state.tab = b.dataset.tab; state.offset = 0; loadFeed(); });
+document.getElementById('sort').addEventListener('change', e => { state.sort = e.target.value; state.offset = 0; loadFeed(); });
+document.getElementById('hideOwn').addEventListener('change', e => { state.hideOwn = e.target.checked; state.offset = 0; loadFeed(); });
+let qt; document.getElementById('q').addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value; state.offset = 0; if (state.view !== 'conv') showView('conv'); else loadFeed(); }, 300); });
+document.getElementById('prev').addEventListener('click', () => { state.offset = Math.max(0, state.offset - state.limit); loadFeed(); window.scrollTo({top:0, behavior:'smooth'}); });
+document.getElementById('next').addEventListener('click', () => { state.offset += state.limit; loadFeed(); window.scrollTo({top:0, behavior:'smooth'}); });
+document.getElementById('clearTag').addEventListener('click', () => { state.tag = ''; document.getElementById('clearTag').style.display = 'none'; state.offset = 0; loadFeed(); });
+document.getElementById('view-overview').addEventListener('click', e => {
+  const t = e.target.closest('a[data-tag]'); const u = e.target.closest('a[data-user]'); const o = e.target.closest('a[data-open]');
+  if (t) { e.preventDefault(); state.tag = t.dataset.tag; const c = document.getElementById('clearTag'); c.textContent = '✕ ' + t.dataset.tag; c.style.display = ''; state.offset = 0; showView('conv'); }
+  if (u) { e.preventDefault(); state.q = u.dataset.user; document.getElementById('q').value = state.q; state.offset = 0; showView('conv'); }
+  if (o) { e.preventDefault(); state.tab = 'risk'; state.q = ''; document.getElementById('q').value = ''; document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === 'risk')); state.offset = 0; showView('conv'); }
+});
+document.getElementById('feed').addEventListener('click', async e => {
+  const ex = e.target.closest('button[data-expand]'); if (ex) return expandReplies(ex.dataset.expand);
+  const co = e.target.closest('button[data-collapse]'); if (co) return collapseReplies(co.dataset.collapse);
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  if (b.dataset.act === 'override') await api(`/api/posts/${b.dataset.id}/override`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ sentiment: b.dataset.v || null }) });
+  else await api(`/api/posts/${b.dataset.id}/handled`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ handled: b.dataset.v === '1' }) });
+  loadFeed();
+});
+async function refresh() { try { if (!state.roleLoaded) { state.role = (await api('/api/me')).role; state.roleLoaded = true; } await loadHealth(); if (state.view === 'conv') await loadFeed(); else await loadOverview(); } catch (e) { console.error(e); document.getElementById('health').textContent = 'Error: ' + e.message; } }
+refresh();
+setInterval(refresh, 5 * 60 * 1000);
+</script>
+</body>
+</html>
